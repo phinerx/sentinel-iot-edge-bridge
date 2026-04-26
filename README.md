@@ -1,2 +1,2 @@
 # sentinel-iot-edge-bridge
-Core architecture initialized by automated workflow.
+Core architecture initialized by  workflow.
