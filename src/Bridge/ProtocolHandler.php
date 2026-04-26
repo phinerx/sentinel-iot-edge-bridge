@@ -2,26 +2,40 @@
 
 namespace Sentinel\Bridge;
 
+use Sentinel\Contracts\ProtocolInterface;
+use Sentinel\Exceptions\ValidationException;
+
 /**
- * Handles low-level binary frame parsing for incoming IoT telemetry streams.
- * Employs non-blocking I/O to maintain throughput during high-concurrency events.
+ * Handles low-latency message routing between hardware interfaces and the persistence layer.
  */
-class ProtocolHandler
+class ProtocolHandler implements ProtocolInterface
 {
-    private const FRAME_HEADER = 0xAA;
+    private array $schema;
 
-    public function processStream(string $payload): array
+    public function __construct(array $schema)
     {
-        $data = unpack('Cheader/nlength/Ctype/C*data', $payload);
+        $this->schema = $schema;
+    }
 
-        if ($data['header'] !== self::FRAME_HEADER) {
-            throw new \InvalidArgumentException('Invalid protocol frame header detected.');
+    public function process(string $payload): bool
+    {
+        $decoded = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+
+        if (!$this->validate($decoded)) {
+            throw new ValidationException('Invalid sensor schema detected.');
         }
 
-        return [
-            'type' => $data['type'],
-            'payload' => array_slice($data, 3),
-            'timestamp' => microtime(true)
-        ];
+        return $this->dispatch($decoded);
+    }
+
+    private function validate(array $data): bool
+    {
+        return isset($data['sensor_id'], $data['timestamp'], $data['payload']);
+    }
+
+    private function dispatch(array $data): bool
+    {
+        // Logic for offloading to the message queue
+        return true;
     }
 }
