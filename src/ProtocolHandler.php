@@ -1,29 +1,28 @@
 <?php
 
-namespace Sentinel\Bridge;
+namespace Sentinel\Edge;
 
 /**
- * Handles low-latency ingestion of binary telemetry frames from edge sensors.
- * Implements a non-blocking queue mechanism for high-throughput environments.
+ * Handles low-latency ingestion of heterogeneous sensor telemetry.
  */
 class ProtocolHandler
 {
-    private array $buffer = [];
-    private int $maxBufferSize = 1024;
+    private \Redis $cache;
 
-    public function ingest(string $payload): bool
+    public function __construct(string $host, int $port)
     {
-        if (count($this->buffer) >= $this->maxBufferSize) {
-            $this->flush();
-        }
-
-        $this->buffer[] = unpack('C*', $payload);
-        return true;
+        $this->cache = new \Redis();
+        $this->cache->connect($host, $port);
     }
 
-    private function flush(): void
+    public function processTelemetry(string $payload): bool
     {
-        // Offload buffer to persistent storage layer via local socket
-        $this->buffer = [];
+        $data = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+        
+        if (!isset($data['sensor_id'], $data['timestamp'])) {
+            throw new \InvalidArgumentException('Malformed telemetry packet received.');
+        }
+
+        return $this->cache->lPush('telemetry_buffer', json_encode($data));
     }
 }
